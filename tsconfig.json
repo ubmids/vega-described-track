@@ -1,0 +1,9 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": ["jest", "node", "@amazon-devices/react-native-kepler"],
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["src", "test"]
+}

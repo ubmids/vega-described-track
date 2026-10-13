@@ -1,0 +1,13 @@
+{
+  "preset": "@amazon-devices/react-native-kepler",
+  "testRegex": "/test/.*\\.test\\.(ts|tsx)$",
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+  "moduleNameMapper": {
+    "^react-native$": "@amazon-devices/react-native-kepler",
+    "^react-native/(.*)$": "@amazon-devices/react-native-kepler/$1"
+  },
+  "roots": ["<rootDir>/src/", "<rootDir>/test/", "<rootDir>/node_modules/"],
+  "transformIgnorePatterns": [
+    "node_modules/(?!(react-native|@react-native|@amazon-devices/react-native-kepler|@amazon-devices)/)"
+  ]
+}
