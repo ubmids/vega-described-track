@@ -1,0 +1,96 @@
+diff --git a/apps/vega/package.json b/apps/vega/package.json
+index 5555917..729328c 100644
+--- a/apps/vega/package.json
++++ b/apps/vega/package.json
+@@ -39,7 +39,8 @@
+     "react-native-keyevent": "*",
+     "react-native-pixel-perfect": "*",
+     "react-native-video": "*",
+-    "react-tv-space-navigation": "*"
++    "react-tv-space-navigation": "*",
++    "vega-described-track": "github:ubmids/vega-described-track"
+   },
+   "devDependencies": {
+     "@amazon-devices/kepler-cli-platform": "^0",
+diff --git a/packages/shared-ui/src/screens/PlayerScreen.vega.tsx b/packages/shared-ui/src/screens/PlayerScreen.vega.tsx
+index c40e649..0d667b7 100644
+--- a/packages/shared-ui/src/screens/PlayerScreen.vega.tsx
++++ b/packages/shared-ui/src/screens/PlayerScreen.vega.tsx
+@@ -1,5 +1,5 @@
+-import React, { useRef, useState, useEffect, useCallback } from 'react';
+-import { View, StyleSheet, BackHandler } from 'react-native';
++import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
++import { View, StyleSheet, BackHandler, Text } from 'react-native';
+ import { SpatialNavigationRoot } from 'react-tv-space-navigation';
+ import { useIsFocused } from '@react-navigation/native';
+ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+@@ -9,6 +9,13 @@ import {
+   useKeplerAppStateManager,
+ } from '@amazon-devices/react-native-kepler';
+ import { VideoPlayer as W3CVideoPlayer } from '@amazon-devices/react-native-w3cmedia';
++import {
++  Speaker,
++  parseWebVTT,
++  useDescriptions,
++  type Cue,
++  type Track,
++} from 'vega-described-track';
+ import RemoteControlManager from '../app/remote-control/RemoteControlManager';
+ import { SupportedKeys } from '../app/remote-control/SupportedKeys';
+ import VideoOverlay from '../components/player/VideoOverlay.vega';
+@@ -66,6 +73,28 @@ export default function PlayerScreen() {
+   const durationRef = useRef<number>(0);
+   const videoHandlerRef = useRef<VideoHandler | null>(null);
+ 
++  // Audio description: one accessibility voice, the title's description
++  // track (a WebVTT file beside the stream, with one clip per cue), driven
++  // by the clock this screen already keeps.
++  const speaker = useMemo(() => new Speaker(), []);
++  useEffect(() => () => speaker.release(), [speaker]);
++  const [adTrack, setAdTrack] = useState<Track | null>(null);
++  useEffect(() => {
++    const vtt = movie.replace(/\.(mp4|m3u8|mpd)$/, '.ad.vtt');
++    const clip = (_c: Cue, i: number) =>
++      vtt.replace(/\.vtt$/, `/cue-${String(i + 1).padStart(3, '0')}.m4a`);
++    fetch(vtt)
++      .then((r) => (r.ok ? r.text() : ''))
++      .then((text) => setAdTrack(parseWebVTT(text, { audioFor: clip })))
++      .catch(() => setAdTrack(null));
++  }, [movie]);
++  const speak = useCallback((c: Cue) => speaker.speak(c), [speaker]);
++  const silence = useCallback(() => speaker.stop(), [speaker]);
++  const { onTimeUpdate, speaking } = useDescriptions(adTrack, 'full', speak, silence);
++  useEffect(() => {
++    onTimeUpdate(currentTime, !paused && !isVideoBuffering);
++  }, [currentTime, paused, isVideoBuffering, onTimeUpdate]);
++
+   // Update refs when state changes
+   useEffect(() => {
+     currentTimeRef.current = currentTime;
+@@ -353,6 +382,9 @@ export default function PlayerScreen() {
+             isBuffering={isVideoBuffering}
+           />
+         )}
++
++        {/* The description being spoken, for anyone watching as well */}
++        {speaking && <Text style={styles.description}>{speaking.text}</Text>}
+       </View>
+     </SpatialNavigationRoot>
+   );
+@@ -364,6 +396,16 @@ const usePlayerStyles = () => {
+       flex: 1,
+       backgroundColor: '#000',
+     },
++    description: {
++      position: 'absolute',
++      left: 64,
++      bottom: 140,
++      maxWidth: '60%',
++      color: '#fff',
++      fontSize: 30,
++      backgroundColor: 'rgba(0,0,0,0.75)',
++      padding: 16,
++    },
+     errorContainer: {
+       ...StyleSheet.absoluteFillObject,
+       backgroundColor: '#000',
